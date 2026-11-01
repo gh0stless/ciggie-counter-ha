@@ -88,6 +88,22 @@ automation:
           entity_id: switch.ciggie_counter_mute_reminders
 ```
 
+## The Butt Bin
+
+![Butt Bin design study: a brushed steel ashtray with a clear plunger knob and a ring of LEDs](images/butt-bin.jpg)
+
+*Design study (AI render). The prototype is being built.*
+
+The **Butt Bin** is an ashtray that counts by itself: you stub out the cigarette and push the knob down – the cigarette drops inside and is counted, with the time. It keeps every entry even when no phone or Home Assistant is around and hands them over via Bluetooth Low Energy later.
+
+- **Inside the knob:** a small Bluetooth chip (Telink TLSR8253), a sealed push switch, a ring of 9 LEDs and a CR2450 coin cell that should last years – no cable, no charging.
+- **Counts on its own:** a ring buffer with timestamps; nothing is lost and nothing is counted twice when it syncs.
+- **Today** the Ciggie Counter Android app collects the entries and passes them on to Home Assistant or Nextcloud, together with the battery level (`sensor.ciggie_counter_butt_bin_battery`).
+- **Next:** Home Assistant connects to the Butt Bin directly (local Bluetooth or ESPHome Bluetooth proxies), no phone needed.
+- **Later:** room air sensor, scent sprayer and a small display – the API already has fields for them.
+
+Firmware, schematic and board are open source in the [main repository](https://github.com/gh0stless/ciggie-counter); more at [crazy-midi.de](https://crazy-midi.de). No Butt Bin? Use any button or contact you like (see *Features*).
+
 ## Sync with the Android app
 
 The Android app can use Home Assistant instead of (or besides) Nextcloud: enter your Home Assistant URL (also from outside, e.g. Nabu Casa or your own domain) and a **long-lived access token** (your profile → Security). *Supported from Android app version 1.0.7.*
