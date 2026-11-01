@@ -107,6 +107,8 @@ Firmware, schematic and board are open source in the [main repository](https://g
 
 The Android app can use Home Assistant instead of (or besides) Nextcloud: enter your Home Assistant URL (also from outside, e.g. Nabu Casa or your own domain) and a **long-lived access token** (your profile → Security). *Supported from Android app version 1.0.7.*
 
+> **A small piece of unsolicited advice 🤓:** your phone does not belong in your home network. It runs dozens of apps you cannot look into, so put it in the **guest Wi-Fi** and keep your servers, NAS and smart home in the main network. Ciggie Counter is built for that: the phone talks to Home Assistant or Nextcloud over **HTTPS** like any other device on the internet – no open ports towards the phone, no local network access needed.
+
 API, all under `/api/ciggie_counter`, Home Assistant authentication (Bearer token):
 
 | | |
