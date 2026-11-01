@@ -8,7 +8,7 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
-from homeassistant.helpers import selector
+from homeassistant.helpers import entity_registry as er, selector
 
 from .nextcloud import NextcloudError, NextcloudSync
 from .const import (
@@ -72,6 +72,8 @@ class CiggieOptionsFlow(OptionsFlow):
                 return self.async_create_entry(data=user_input)
 
         o = {**DEFAULTS, **self.config_entry.options, **(user_input or {})}
+        # our own entities are no count sources (the count button counts by itself)
+        own = [e.entity_id for e in er.async_entries_for_config_entry(er.async_get(self.hass), self.config_entry.entry_id)]
 
         def opt(key: str) -> vol.Optional:
             # only pre-fill what is set, so optional fields can be cleared
@@ -91,9 +93,10 @@ class CiggieOptionsFlow(OptionsFlow):
                 vol.Required(CONF_NEXT_ALLOWED_REMINDER, default=o[CONF_NEXT_ALLOWED_REMINDER]): selector.BooleanSelector(),
                 vol.Required(CONF_COUNT_CHECK_REMINDER, default=o[CONF_COUNT_CHECK_REMINDER]): selector.BooleanSelector(),
                 vol.Required(CONF_COUNT_CHECK_MINUTES, default=o[CONF_COUNT_CHECK_MINUTES]): _number(1, 1440),
-                vol.Optional(CONF_COUNT_SOURCES, default=o[CONF_COUNT_SOURCES]): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain=COUNT_SOURCE_DOMAINS, multiple=True)
-                ),
+                vol.Optional(CONF_COUNT_SOURCES, default=[e for e in o[CONF_COUNT_SOURCES] if e not in own]):
+                    selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain=COUNT_SOURCE_DOMAINS, multiple=True, exclude_entities=own)
+                    ),
                 opt(CONF_NC_URL): selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.URL)),
                 opt(CONF_NC_USER): selector.TextSelector(),
                 opt(CONF_NC_PASSWORD): selector.TextSelector(

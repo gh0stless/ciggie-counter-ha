@@ -10,7 +10,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN, Platform
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, ServiceCall, callback
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, entity_registry as er
 from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
@@ -99,7 +99,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: CiggieConfigEntry) -> bo
         entry.async_on_unload(sync.debouncer.async_shutdown)
         entry.async_create_background_task(hass, sync.async_sync_quietly(), "ciggie_counter nextcloud sync")
 
-    sources: list[str] = o.get(CONF_COUNT_SOURCES, [])
+    # never our own entities: the count button already counts by itself (would count twice)
+    registry = er.async_get(hass)
+    sources = [
+        entity_id for entity_id in o.get(CONF_COUNT_SOURCES, [])
+        if (reg := registry.async_get(entity_id)) is None or reg.platform != DOMAIN
+    ]
     if sources:
         entry.async_on_unload(async_track_state_change_event(hass, sources, _source_listener(counter)))
 

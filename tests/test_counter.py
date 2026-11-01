@@ -269,3 +269,17 @@ async def test_data_survives_reload(hass: HomeAssistant, entry: MockConfigEntry)
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     assert _value(hass, TODAY) == "1"
+
+
+async def test_own_button_is_no_count_source(hass: HomeAssistant, options: dict[str, Any]) -> None:
+    """Configuring the integration's own button as a source must not count twice."""
+    options[CONF_COUNT_SOURCES] = ["button.ciggie_counter_count_cigarette"]
+    config_entry = MockConfigEntry(domain=DOMAIN, data={}, options=options)
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    # the entity exists only after the first setup: reload so the filter sees it in the registry
+    assert await hass.config_entries.async_reload(config_entry.entry_id)
+    await hass.async_block_till_done()
+    await _press(hass)
+    assert len(config_entry.runtime_data.active) == 1
