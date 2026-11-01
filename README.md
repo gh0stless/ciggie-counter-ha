@@ -98,8 +98,7 @@ The **Butt Bin** is an ashtray that counts by itself: you stub out the cigarette
 
 - **Inside the knob:** a small Bluetooth chip (Telink TLSR8253), a sealed push switch, a ring of 9 LEDs and a CR2450 coin cell that should last years – no cable, no charging.
 - **Counts on its own:** a ring buffer with timestamps; nothing is lost and nothing is counted twice when it syncs.
-- **Today** the Ciggie Counter Android app collects the entries and passes them on to Home Assistant or Nextcloud, together with the battery level (`sensor.ciggie_counter_butt_bin_battery`).
-- **Next:** Home Assistant connects to the Butt Bin directly (local Bluetooth or ESPHome Bluetooth proxies), no phone needed.
+- The Ciggie Counter Android app collects the entries via Bluetooth and passes them on to Home Assistant or Nextcloud over HTTPS, together with the battery level (`sensor.ciggie_counter_butt_bin_battery`). That works anywhere your phone has internet – no Bluetooth proxy at home needed.
 - **Later:** room air sensor, scent sprayer and a small display – the API already has fields for them.
 
 Firmware, schematic and board are open source in the [main repository](https://github.com/gh0stless/ciggie-counter); more at [crazy-midi.de](https://crazy-midi.de). No Butt Bin? Use any button or contact you like (see *Features*).
