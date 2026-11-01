@@ -1,0 +1,12 @@
+count:
+  fields:
+    timestamp:
+      required: false
+      selector:
+        datetime:
+    source:
+      required: false
+      selector:
+        text:
+
+delete_last:

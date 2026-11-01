@@ -1,0 +1,14 @@
+{
+  "domain": "ciggie_counter",
+  "name": "Ciggie Counter",
+  "codeowners": ["@gh0stless"],
+  "config_flow": true,
+  "dependencies": ["http"],
+  "documentation": "https://github.com/gh0stless/ciggie-counter-ha",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/gh0stless/ciggie-counter-ha/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}

@@ -1,0 +1,82 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Count cigarettes in Home Assistant. Settings (cost, breaks, reminders, entities that count) are under Configure after adding."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Ciggie Counter is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ciggie Counter",
+        "data": {
+          "cost_per_cigarette": "Cost per cigarette",
+          "day_start_hour": "New day starts at (hour)",
+          "interval_mode": "Breaks",
+          "daily_target": "Daily target (cigarettes)",
+          "wake_hours": "Waking hours per day",
+          "fixed_interval_minutes": "Fixed break (minutes)",
+          "next_allowed_reminder": "Reminder \"You may smoke again\"",
+          "count_check_reminder": "Reminder \"Did you count them all?\"",
+          "count_check_minutes": "… every (minutes)",
+          "count_sources": "Entities that count a cigarette"
+        },
+        "data_description": {
+          "day_start_hour": "Cigarettes before this hour still count for the day before (e.g. 4 for night owls).",
+          "interval_mode": "Calculated: the rest of the daily target is spread over the remaining waking time, smoking faster makes breaks longer.",
+          "count_sources": "Buttons, contacts, switches or event entities. Each press or each change to on counts one cigarette.",
+          "next_allowed_reminder": "Fires the event ciggie_counter_reminder (type next_allowed) – use it in an automation for TTS, Telegram …"
+        }
+      }
+    }
+  },
+  "selector": {
+    "interval_mode": {
+      "options": {
+        "computed": "Calculate from daily target",
+        "fixed": "Fixed break",
+        "off": "Off"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "today": { "name": "Today" },
+      "yesterday": { "name": "Yesterday" },
+      "month": { "name": "This month" },
+      "year": { "name": "This year" },
+      "cost_today": { "name": "Cost today" },
+      "break": { "name": "Break" },
+      "next_allowed": { "name": "Next allowed" },
+      "last_cigarette": { "name": "Last cigarette" },
+      "ashtray_battery": { "name": "Butt Bin battery" }
+    },
+    "binary_sensor": {
+      "allowed": { "name": "Allowed" }
+    },
+    "button": {
+      "count": { "name": "Count cigarette" }
+    },
+    "switch": {
+      "muted": { "name": "Mute reminders" }
+    }
+  },
+  "services": {
+    "count": {
+      "name": "Count cigarette",
+      "description": "Counts a cigarette now or at a given time.",
+      "fields": {
+        "timestamp": { "name": "Time", "description": "Optional, for a cigarette you forgot. Default: now." },
+        "source": { "name": "Source", "description": "Optional label, e.g. the name of a button." }
+      }
+    },
+    "delete_last": {
+      "name": "Delete last cigarette",
+      "description": "Deletes the newest entry, e.g. after a double press."
+    }
+  }
+}

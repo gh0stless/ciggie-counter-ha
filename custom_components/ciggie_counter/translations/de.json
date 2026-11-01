@@ -1,0 +1,82 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "description": "Zigaretten in Home Assistant zählen. Einstellungen (Kosten, Pausen, Erinnerungen, zählende Entitäten) findest du nach dem Hinzufügen unter Konfigurieren."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Ciggie Counter ist schon eingerichtet."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ciggie Counter",
+        "data": {
+          "cost_per_cigarette": "Kosten pro Zigarette",
+          "day_start_hour": "Tageswechsel um (Uhr)",
+          "interval_mode": "Pausen",
+          "daily_target": "Tagesziel (Zigaretten)",
+          "wake_hours": "Wachstunden pro Tag",
+          "fixed_interval_minutes": "Feste Pause (Minuten)",
+          "next_allowed_reminder": "Erinnerung „Du darfst wieder“",
+          "count_check_reminder": "Erinnerung „Hast du alle gezählt?“",
+          "count_check_minutes": "… alle (Minuten)",
+          "count_sources": "Entitäten, die eine Zigarette zählen"
+        },
+        "data_description": {
+          "day_start_hour": "Zigaretten vor dieser Uhrzeit zählen noch zum Vortag (z. B. 4 für Nachtschwärmer).",
+          "interval_mode": "Berechnet: Der Rest des Tagesziels wird über die verbleibende Wachzeit verteilt, wer schneller raucht, bekommt längere Pausen.",
+          "count_sources": "Taster, Kontakte, Schalter oder Ereignis-Entitäten. Jeder Druck bzw. jedes Einschalten zählt eine Zigarette.",
+          "next_allowed_reminder": "Löst das Ereignis ciggie_counter_reminder (type next_allowed) aus – damit in einer Automation TTS, Telegram … auslösen."
+        }
+      }
+    }
+  },
+  "selector": {
+    "interval_mode": {
+      "options": {
+        "computed": "Aus Tagesziel berechnen",
+        "fixed": "Feste Pause",
+        "off": "Aus"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "today": { "name": "Heute" },
+      "yesterday": { "name": "Gestern" },
+      "month": { "name": "Dieser Monat" },
+      "year": { "name": "Dieses Jahr" },
+      "cost_today": { "name": "Kosten heute" },
+      "break": { "name": "Pause" },
+      "next_allowed": { "name": "Nächste erlaubt" },
+      "last_cigarette": { "name": "Letzte Zigarette" },
+      "ashtray_battery": { "name": "Butt-Bin-Batterie" }
+    },
+    "binary_sensor": {
+      "allowed": { "name": "Erlaubt" }
+    },
+    "button": {
+      "count": { "name": "Zigarette zählen" }
+    },
+    "switch": {
+      "muted": { "name": "Erinnerungen stumm" }
+    }
+  },
+  "services": {
+    "count": {
+      "name": "Zigarette zählen",
+      "description": "Zählt eine Zigarette jetzt oder zu einer bestimmten Zeit.",
+      "fields": {
+        "timestamp": { "name": "Zeit", "description": "Optional, für eine vergessene Zigarette. Standard: jetzt." },
+        "source": { "name": "Quelle", "description": "Optionale Bezeichnung, z. B. der Name eines Tasters." }
+      }
+    },
+    "delete_last": {
+      "name": "Letzte Zigarette löschen",
+      "description": "Löscht den neuesten Eintrag, z. B. nach einem Doppeldruck."
+    }
+  }
+}
