@@ -12,7 +12,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, UnitOfTime
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -52,6 +52,9 @@ SENSORS: tuple[CiggieSensorDescription, ...] = (
     CiggieSensorDescription(key="ashtray_battery", device_class=SensorDeviceClass.BATTERY,
                             native_unit_of_measurement=PERCENTAGE, state_class=SensorStateClass.MEASUREMENT,
                             value=lambda c: c.ashtray["battery"]),
+    CiggieSensorDescription(key="last_sync", device_class=SensorDeviceClass.TIMESTAMP,
+                            entity_category=EntityCategory.DIAGNOSTIC, entity_registry_enabled_default=False,
+                            value=lambda c: c.last_hub_sync),
 )
 
 

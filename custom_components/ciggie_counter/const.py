@@ -20,6 +20,10 @@ CONF_NEXT_ALLOWED_REMINDER: Final = "next_allowed_reminder"
 CONF_COUNT_CHECK_REMINDER: Final = "count_check_reminder"
 CONF_COUNT_CHECK_MINUTES: Final = "count_check_minutes"
 CONF_COUNT_SOURCES: Final = "count_sources"
+# optional Nextcloud with the app "cigarettecounter" as sync hub
+CONF_NC_URL: Final = "nextcloud_url"
+CONF_NC_USER: Final = "nextcloud_user"
+CONF_NC_PASSWORD: Final = "nextcloud_app_password"
 
 MODE_COMPUTED: Final = "computed"
 MODE_FIXED: Final = "fixed"

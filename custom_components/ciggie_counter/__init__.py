@@ -15,9 +15,10 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_COUNT_SOURCES, DOMAIN
+from .const import CONF_COUNT_SOURCES, CONF_NC_PASSWORD, CONF_NC_URL, CONF_NC_USER, DOMAIN
 from .counter import CiggieCounter
 from .http import async_register_views
+from .nextcloud import INTERVAL, NextcloudSync
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,7 +85,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: CiggieConfigEntry) -> bo
 
     entry.async_on_unload(async_track_time_interval(hass, tick, timedelta(minutes=1)))
 
-    sources: list[str] = entry.options.get(CONF_COUNT_SOURCES, [])
+    o = entry.options
+    if o.get(CONF_NC_URL) and o.get(CONF_NC_USER) and o.get(CONF_NC_PASSWORD):
+        sync = NextcloudSync(hass, counter, o[CONF_NC_URL], o[CONF_NC_USER], o[CONF_NC_PASSWORD])
+        counter.async_use_hub(f"{o[CONF_NC_URL].rstrip('/')}|{o[CONF_NC_USER]}")
+        counter.on_local_change = sync.async_schedule
+
+        @callback
+        def sync_tick(now: datetime) -> None:
+            entry.async_create_background_task(hass, sync.async_sync_quietly(), "ciggie_counter nextcloud sync")
+
+        entry.async_on_unload(async_track_time_interval(hass, sync_tick, INTERVAL))
+        entry.async_on_unload(sync.debouncer.async_shutdown)
+        entry.async_create_background_task(hass, sync.async_sync_quietly(), "ciggie_counter nextcloud sync")
+
+    sources: list[str] = o.get(CONF_COUNT_SOURCES, [])
     if sources:
         entry.async_on_unload(async_track_state_change_event(hass, sources, _source_listener(counter)))
 

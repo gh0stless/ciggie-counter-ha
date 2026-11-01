@@ -23,15 +23,25 @@
           "next_allowed_reminder": "Erinnerung „Du darfst wieder“",
           "count_check_reminder": "Erinnerung „Hast du alle gezählt?“",
           "count_check_minutes": "… alle (Minuten)",
-          "count_sources": "Entitäten, die eine Zigarette zählen"
+          "count_sources": "Entitäten, die eine Zigarette zählen",
+          "nextcloud_url": "Nextcloud (optional)",
+          "nextcloud_user": "Nextcloud-Benutzer",
+          "nextcloud_app_password": "Nextcloud-App-Passwort"
         },
         "data_description": {
           "day_start_hour": "Zigaretten vor dieser Uhrzeit zählen noch zum Vortag (z. B. 4 für Nachtschwärmer).",
           "interval_mode": "Berechnet: Der Rest des Tagesziels wird über die verbleibende Wachzeit verteilt, wer schneller raucht, bekommt längere Pausen.",
           "count_sources": "Taster, Kontakte, Schalter oder Ereignis-Entitäten. Jeder Druck bzw. jedes Einschalten zählt eine Zigarette.",
-          "next_allowed_reminder": "Löst das Ereignis ciggie_counter_reminder (type next_allowed) aus – damit in einer Automation TTS, Telegram … auslösen."
+          "next_allowed_reminder": "Löst das Ereignis ciggie_counter_reminder (type next_allowed) aus – damit in einer Automation TTS, Telegram … auslösen.",
+          "nextcloud_url": "Abgleich mit der Nextcloud-App „cigarettecounter“ (ab 0.9.11), z. B. https://cloud.example.org. Home Assistant übernimmt alle Einträge von dort und schickt seine eigenen. App-Passwort anlegen: Nextcloud → Einstellungen → Sicherheit."
         }
       }
+    },
+    "error": {
+      "nextcloud_incomplete": "Für Nextcloud bitte Adresse, Benutzer und App-Passwort ausfüllen (oder alle drei leer lassen).",
+      "cannot_connect": "Nextcloud ist nicht erreichbar.",
+      "invalid_auth": "Nextcloud hat Benutzer oder App-Passwort abgelehnt.",
+      "app_missing": "Die Nextcloud-App „cigarettecounter“ (ab Version 0.9.11) wurde nicht gefunden."
     }
   },
   "selector": {
@@ -45,24 +55,51 @@
   },
   "entity": {
     "sensor": {
-      "today": { "name": "Heute" },
-      "yesterday": { "name": "Gestern" },
-      "month": { "name": "Dieser Monat" },
-      "year": { "name": "Dieses Jahr" },
-      "cost_today": { "name": "Kosten heute" },
-      "break": { "name": "Pause" },
-      "next_allowed": { "name": "Nächste erlaubt" },
-      "last_cigarette": { "name": "Letzte Zigarette" },
-      "ashtray_battery": { "name": "Butt-Bin-Batterie" }
+      "today": {
+        "name": "Heute"
+      },
+      "yesterday": {
+        "name": "Gestern"
+      },
+      "month": {
+        "name": "Dieser Monat"
+      },
+      "year": {
+        "name": "Dieses Jahr"
+      },
+      "cost_today": {
+        "name": "Kosten heute"
+      },
+      "break": {
+        "name": "Pause"
+      },
+      "next_allowed": {
+        "name": "Nächste erlaubt"
+      },
+      "last_cigarette": {
+        "name": "Letzte Zigarette"
+      },
+      "ashtray_battery": {
+        "name": "Butt-Bin-Batterie"
+      },
+      "last_sync": {
+        "name": "Letzter Nextcloud-Abgleich"
+      }
     },
     "binary_sensor": {
-      "allowed": { "name": "Erlaubt" }
+      "allowed": {
+        "name": "Erlaubt"
+      }
     },
     "button": {
-      "count": { "name": "Zigarette zählen" }
+      "count": {
+        "name": "Zigarette zählen"
+      }
     },
     "switch": {
-      "muted": { "name": "Erinnerungen stumm" }
+      "muted": {
+        "name": "Erinnerungen stumm"
+      }
     }
   },
   "services": {
@@ -70,8 +107,14 @@
       "name": "Zigarette zählen",
       "description": "Zählt eine Zigarette jetzt oder zu einer bestimmten Zeit.",
       "fields": {
-        "timestamp": { "name": "Zeit", "description": "Optional, für eine vergessene Zigarette. Standard: jetzt." },
-        "source": { "name": "Quelle", "description": "Optionale Bezeichnung, z. B. der Name eines Tasters." }
+        "timestamp": {
+          "name": "Zeit",
+          "description": "Optional, für eine vergessene Zigarette. Standard: jetzt."
+        },
+        "source": {
+          "name": "Quelle",
+          "description": "Optionale Bezeichnung, z. B. der Name eines Tasters."
+        }
       }
     },
     "delete_last": {

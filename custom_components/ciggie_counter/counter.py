@@ -7,7 +7,7 @@ kept as tombstones, every change gets a new revision number.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import date, datetime, timedelta
 import logging
 from typing import Any
@@ -72,6 +72,13 @@ class CiggieCounter:
         self._last_notified_for: str | None = None
         self._last_count_check_at: str | None = None
         self._active: list[datetime] = []
+        # Nextcloud as hub (optional): last revision fetched, mute changed here and not yet sent
+        self.hub_rev = 0
+        self.hub_key: str | None = None
+        self.mute_dirty = False
+        self.last_hub_sync: datetime | None = None
+        # called after local changes, e.g. to sync soon
+        self.on_local_change: Callable[[], None] | None = None
 
     # ------------------------------------------------------------------ storage
 
@@ -83,6 +90,9 @@ class CiggieCounter:
         self.ashtray |= {k: v for k, v in data.get("ashtray", {}).items() if k in self.ashtray}
         self._last_notified_for = data.get("last_notified_for")
         self._last_count_check_at = data.get("last_count_check_at")
+        self.hub_rev = int(data.get("hub_rev", 0))
+        self.hub_key = data.get("hub_key")
+        self.mute_dirty = bool(data.get("mute_dirty", False))
         self._rebuild()
 
     def _data(self) -> dict[str, Any]:
@@ -93,13 +103,18 @@ class CiggieCounter:
             "ashtray": self.ashtray,
             "last_notified_for": self._last_notified_for,
             "last_count_check_at": self._last_count_check_at,
+            "hub_rev": self.hub_rev,
+            "hub_key": self.hub_key,
+            "mute_dirty": self.mute_dirty,
         }
 
     @callback
-    def _changed(self) -> None:
+    def _changed(self, local: bool = True) -> None:
         self._rebuild()
         self._store.async_delay_save(self._data, 1)
         async_dispatcher_send(self.hass, SIGNAL_UPDATE)
+        if local and self.on_local_change is not None:
+            self.on_local_change()
 
     def _rebuild(self) -> None:
         active = [p for r in self.records if not r.get("deleted") and (p := _parse(r["ts"])) is not None]
@@ -202,7 +217,7 @@ class CiggieCounter:
         self.rev += 1
         self.records.append(
             {"id": str(uuid.uuid4()), "ts": dt_util.as_local(when).isoformat(timespec="seconds"),
-             "source": source, "deleted": False, "rev": self.rev}
+             "source": source, "deleted": False, "rev": self.rev, "dirty": True}
         )
         self._counted([when], source)
         self._changed()
@@ -221,6 +236,7 @@ class CiggieCounter:
         self.rev += 1
         newest[1]["deleted"] = True
         newest[1]["rev"] = self.rev
+        newest[1]["dirty"] = True
         self._changed()
         return True
 
@@ -245,8 +261,12 @@ class CiggieCounter:
         return {"rev": self.rev, "entries": [r for r in self.records if r["rev"] > since]}
 
     @callback
-    def async_merge(self, incoming: Iterable[Any], source: str = "sync") -> dict[str, int]:
-        """Take over records of another device. A tombstone always wins; times never change."""
+    def async_merge(self, incoming: Iterable[Any], source: str = "sync", from_hub: bool = False) -> dict[str, int]:
+        """Take over records of another device. A tombstone always wins; times never change.
+
+        from_hub: the records come from Nextcloud and need not be sent back; records from a phone
+        (from_hub False) are forwarded to Nextcloud with the next sync.
+        """
         index = {r["id"]: r for r in self.records}
         accepted = 0
         added: list[datetime] = []
@@ -265,6 +285,7 @@ class CiggieCounter:
                     self.rev += 1
                     known["deleted"] = True
                     known["rev"] = self.rev
+                    known["dirty"] = not from_hub
                     changed = True
                 continue
             when = _parse(str(item.get("ts", "")))
@@ -273,7 +294,8 @@ class CiggieCounter:
             accepted += 1
             self.rev += 1
             record = {"id": rid, "ts": when.isoformat(timespec="seconds"),
-                      "source": str(item.get("source") or source)[:32], "deleted": deleted, "rev": self.rev}
+                      "source": str(item.get("source") or source)[:32], "deleted": deleted, "rev": self.rev,
+                      "dirty": not from_hub}
             self.records.append(record)
             index[rid] = record
             changed = True
@@ -282,16 +304,50 @@ class CiggieCounter:
         if changed:
             if added:
                 self._counted(added, source)
-            self._changed()
+            self._changed(local=not from_hub)
         return {"rev": self.rev, "accepted": accepted}
+
+    def dirty_records(self) -> list[dict[str, Any]]:
+        """Records not yet sent to Nextcloud."""
+        return [{k: r[k] for k in ("id", "ts", "source", "deleted")} for r in self.records if r.get("dirty")]
+
+    @callback
+    def async_mark_clean(self, sent: Iterable[dict[str, Any]]) -> None:
+        """Sent successfully. A record deleted while it was on its way stays dirty."""
+        state = {r["id"]: r["deleted"] for r in sent}
+        for record in self.records:
+            if record["id"] in state and bool(record.get("deleted")) == state[record["id"]]:
+                record.pop("dirty", None)
+        self._store.async_delay_save(self._data, 1)
+
+    @callback
+    def async_use_hub(self, key: str) -> None:
+        """Another Nextcloud (or user) than before: fetch everything, send everything once."""
+        if self.hub_key == key:
+            return
+        self.hub_key = key
+        self.hub_rev = 0
+        for record in self.records:
+            record["dirty"] = True
+        self.mute_dirty = False
+        self._store.async_delay_save(self._data, 1)
+
+    @callback
+    def async_hub_synced(self, rev: int) -> None:
+        self.hub_rev = rev
+        self.last_hub_sync = dt_util.now()
+        self._store.async_delay_save(self._data, 1)
+        async_dispatcher_send(self.hass, SIGNAL_UPDATE)
 
     # ------------------------------------------------------------------ mute, device
 
     @callback
-    def async_set_muted(self, muted: bool) -> None:
+    def async_set_muted(self, muted: bool, from_hub: bool = False) -> None:
         if self.muted != muted:
             self.muted = muted
-            self._changed()
+            if not from_hub:
+                self.mute_dirty = True
+            self._changed(local=not from_hub)
 
     @callback
     def async_update_ashtray(self, values: dict[str, Any], at: datetime | None = None) -> dict[str, Any]:

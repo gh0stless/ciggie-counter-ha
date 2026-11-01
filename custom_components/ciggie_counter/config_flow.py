@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResu
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
+from .nextcloud import NextcloudError, NextcloudSync
 from .const import (
     CONF_COST,
     CONF_COUNT_CHECK_MINUTES,
@@ -19,6 +20,9 @@ from .const import (
     CONF_DAY_START_HOUR,
     CONF_FIXED_MINUTES,
     CONF_INTERVAL_MODE,
+    CONF_NC_PASSWORD,
+    CONF_NC_URL,
+    CONF_NC_USER,
     CONF_NEXT_ALLOWED_REMINDER,
     CONF_WAKE_HOURS,
     COUNT_SOURCE_DOMAINS,
@@ -53,10 +57,21 @@ def _number(minimum: float, maximum: float, step: float = 1) -> selector.NumberS
 
 class CiggieOptionsFlow(OptionsFlow):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            url, user, password = (user_input.get(k) for k in (CONF_NC_URL, CONF_NC_USER, CONF_NC_PASSWORD))
+            if url or user or password:
+                if not (url and user and password):
+                    errors["base"] = "nextcloud_incomplete"
+                else:
+                    try:
+                        await NextcloudSync(self.hass, self.config_entry.runtime_data, url, user, password).async_test()
+                    except NextcloudError as err:
+                        errors["base"] = str(err)
+            if not errors:
+                return self.async_create_entry(data=user_input)
 
-        o = {**DEFAULTS, **self.config_entry.options}
+        o = {**DEFAULTS, **self.config_entry.options, **(user_input or {})}
 
         def opt(key: str) -> vol.Optional:
             # only pre-fill what is set, so optional fields can be cleared
@@ -79,6 +94,11 @@ class CiggieOptionsFlow(OptionsFlow):
                 vol.Optional(CONF_COUNT_SOURCES, default=o[CONF_COUNT_SOURCES]): selector.EntitySelector(
                     selector.EntitySelectorConfig(domain=COUNT_SOURCE_DOMAINS, multiple=True)
                 ),
+                opt(CONF_NC_URL): selector.TextSelector(selector.TextSelectorConfig(type=selector.TextSelectorType.URL)),
+                opt(CONF_NC_USER): selector.TextSelector(),
+                opt(CONF_NC_PASSWORD): selector.TextSelector(
+                    selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+                ),
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)

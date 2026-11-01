@@ -13,6 +13,7 @@ Count your cigarettes in Home Assistant, pace yourself with breaks and get remin
 - **Mute switch** for everything, e.g. at night
 - **Your day, your rules:** choose the hour at which a new day starts
 - **Sync API** for the Android app, same protocol as the Nextcloud app (sync v2)
+- **Optional sync with Nextcloud** (app "cigarettecounter" from 0.9.11): Home Assistant takes over all entries from there and keeps both in step
 
 ## Installation
 
@@ -102,6 +103,17 @@ The **Butt Bin** is an ashtray that counts by itself: you stub out the cigarette
 - **Later:** room air sensor, scent sprayer and a small display – the API already has fields for them.
 
 Firmware, schematic and board are open source in the [main repository](https://github.com/gh0stless/ciggie-counter); more at [crazy-midi.de](https://crazy-midi.de). No Butt Bin? Use any button or contact you like (see *Features*).
+
+## Sync with Nextcloud
+
+Optional, under *Configure*: Nextcloud address, user and an **app password** (Nextcloud → Settings → Security). Home Assistant checks the connection when you save.
+
+- The first sync takes over all entries from Nextcloud.
+- Then every 5 minutes and shortly after every change: Home Assistant sends its own new entries and deletions (and those it got from a phone) and fetches only what changed on Nextcloud.
+- The mute switch is synced too.
+- `sensor.ciggie_counter_last_nextcloud_sync` (diagnostic, disabled by default) shows the last successful sync; failures are logged.
+
+Entries that reach Home Assistant from Nextcloud fire `ciggie_counter_counted` as well (if they are fresh). If Nextcloud already announces via its own webhook, use one of the two for announcements.
 
 ## Sync with the Android app
 

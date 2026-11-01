@@ -23,15 +23,25 @@
           "next_allowed_reminder": "Reminder \"You may smoke again\"",
           "count_check_reminder": "Reminder \"Did you count them all?\"",
           "count_check_minutes": "… every (minutes)",
-          "count_sources": "Entities that count a cigarette"
+          "count_sources": "Entities that count a cigarette",
+          "nextcloud_url": "Nextcloud (optional)",
+          "nextcloud_user": "Nextcloud user",
+          "nextcloud_app_password": "Nextcloud app password"
         },
         "data_description": {
           "day_start_hour": "Cigarettes before this hour still count for the day before (e.g. 4 for night owls).",
           "interval_mode": "Calculated: the rest of the daily target is spread over the remaining waking time, smoking faster makes breaks longer.",
           "count_sources": "Buttons, contacts, switches or event entities. Each press or each change to on counts one cigarette.",
-          "next_allowed_reminder": "Fires the event ciggie_counter_reminder (type next_allowed) – use it in an automation for TTS, Telegram …"
+          "next_allowed_reminder": "Fires the event ciggie_counter_reminder (type next_allowed) – use it in an automation for TTS, Telegram …",
+          "nextcloud_url": "Sync with the Nextcloud app \"cigarettecounter\" (from 0.9.11), e.g. https://cloud.example.org. Home Assistant takes over all entries from there and sends its own. Create an app password: Nextcloud → Settings → Security."
         }
       }
+    },
+    "error": {
+      "nextcloud_incomplete": "For Nextcloud please fill in address, user and app password (or leave all three empty).",
+      "cannot_connect": "Nextcloud is not reachable.",
+      "invalid_auth": "Nextcloud rejected user or app password.",
+      "app_missing": "The Nextcloud app \"cigarettecounter\" (from version 0.9.11) was not found."
     }
   },
   "selector": {
@@ -45,24 +55,51 @@
   },
   "entity": {
     "sensor": {
-      "today": { "name": "Today" },
-      "yesterday": { "name": "Yesterday" },
-      "month": { "name": "This month" },
-      "year": { "name": "This year" },
-      "cost_today": { "name": "Cost today" },
-      "break": { "name": "Break" },
-      "next_allowed": { "name": "Next allowed" },
-      "last_cigarette": { "name": "Last cigarette" },
-      "ashtray_battery": { "name": "Butt Bin battery" }
+      "today": {
+        "name": "Today"
+      },
+      "yesterday": {
+        "name": "Yesterday"
+      },
+      "month": {
+        "name": "This month"
+      },
+      "year": {
+        "name": "This year"
+      },
+      "cost_today": {
+        "name": "Cost today"
+      },
+      "break": {
+        "name": "Break"
+      },
+      "next_allowed": {
+        "name": "Next allowed"
+      },
+      "last_cigarette": {
+        "name": "Last cigarette"
+      },
+      "ashtray_battery": {
+        "name": "Butt Bin battery"
+      },
+      "last_sync": {
+        "name": "Last Nextcloud sync"
+      }
     },
     "binary_sensor": {
-      "allowed": { "name": "Allowed" }
+      "allowed": {
+        "name": "Allowed"
+      }
     },
     "button": {
-      "count": { "name": "Count cigarette" }
+      "count": {
+        "name": "Count cigarette"
+      }
     },
     "switch": {
-      "muted": { "name": "Mute reminders" }
+      "muted": {
+        "name": "Mute reminders"
+      }
     }
   },
   "services": {
@@ -70,8 +107,14 @@
       "name": "Count cigarette",
       "description": "Counts a cigarette now or at a given time.",
       "fields": {
-        "timestamp": { "name": "Time", "description": "Optional, for a cigarette you forgot. Default: now." },
-        "source": { "name": "Source", "description": "Optional label, e.g. the name of a button." }
+        "timestamp": {
+          "name": "Time",
+          "description": "Optional, for a cigarette you forgot. Default: now."
+        },
+        "source": {
+          "name": "Source",
+          "description": "Optional label, e.g. the name of a button."
+        }
       }
     },
     "delete_last": {
