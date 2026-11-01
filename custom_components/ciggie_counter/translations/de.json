@@ -33,7 +33,7 @@
           "interval_mode": "Berechnet: Der Rest des Tagesziels wird über die verbleibende Wachzeit verteilt, wer schneller raucht, bekommt längere Pausen.",
           "count_sources": "Taster, Kontakte, Schalter oder Ereignis-Entitäten. Jeder Druck bzw. jedes Einschalten zählt eine Zigarette.",
           "next_allowed_reminder": "Löst das Ereignis ciggie_counter_reminder (type next_allowed) aus – damit in einer Automation TTS, Telegram … auslösen.",
-          "nextcloud_url": "Abgleich mit der Nextcloud-App „cigarettecounter“ (ab 0.9.11), z. B. https://cloud.example.org. Home Assistant übernimmt alle Einträge von dort und schickt seine eigenen. App-Passwort anlegen: Nextcloud → Einstellungen → Sicherheit."
+          "nextcloud_url": "Abgleich mit der Nextcloud-App „cigarettecounter“ (ab 0.9.11): die Adresse, mit der du Nextcloud im Browser öffnest. Home Assistant übernimmt alle Einträge von dort und schickt seine eigenen. App-Passwort anlegen: Nextcloud → Einstellungen → Sicherheit."
         }
       }
     },

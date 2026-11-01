@@ -33,7 +33,7 @@
           "interval_mode": "Calculated: the rest of the daily target is spread over the remaining waking time, smoking faster makes breaks longer.",
           "count_sources": "Buttons, contacts, switches or event entities. Each press or each change to on counts one cigarette.",
           "next_allowed_reminder": "Fires the event ciggie_counter_reminder (type next_allowed) – use it in an automation for TTS, Telegram …",
-          "nextcloud_url": "Sync with the Nextcloud app \"cigarettecounter\" (from 0.9.11), e.g. https://cloud.example.org. Home Assistant takes over all entries from there and sends its own. Create an app password: Nextcloud → Settings → Security."
+          "nextcloud_url": "Sync with the Nextcloud app \"cigarettecounter\" (from 0.9.11): the address you open Nextcloud with in the browser. Home Assistant takes over all entries from there and sends its own. Create an app password: Nextcloud → Settings → Security."
         }
       }
     },
