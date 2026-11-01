@@ -1,0 +1,232 @@
+# Ciggie Counter – announcements via TTS and Telegram
+#
+# Listens to the events of the Ciggie Counter integration (no webhook, no Nextcloud needed):
+#   ciggie_counter_reminder  type next_allowed | count_check   (never fired while muted)
+#   ciggie_counter_counted   number, source, muted              (fresh entries only)
+#
+# Version 2.0.0
+# - Successor of the Nextcloud webhook blueprint (cigcounter_announce_blueprint.yaml 1.0.0):
+#   same inputs (night schedule, do-not-disturb, persons at home, TTS engine/player,
+#   Telegram via for_each, telegram_night_mute), trigger = integration events.
+# - Texts configurable, count announcement switchable, silent while muted.
+blueprint:
+  name: "🚬 Ciggie Counter – TTS & Telegram"
+  description: >
+    Speaks the reminders of Ciggie Counter ("You may smoke again", "Did you count them all?")
+    and optionally every counted cigarette via TTS, and sends them via Telegram.
+    Supports a night schedule, a do-not-disturb switch and "only when someone is home".
+    Sagt die Erinnerungen von Ciggie Counter und optional jede gezählte Zigarette an und
+    schickt sie per Telegram; mit Nachtruhe, Bitte-nicht-stören und Anwesenheit.
+  domain: automation
+  author: gh0stless (crazy-midi.de)
+  source_url: https://github.com/gh0stless/ciggie-counter-ha/blob/main/blueprints/automation/ciggie_counter/announce.yaml
+  homeassistant:
+    min_version: "2025.1.0"
+
+  input:
+    # ══════════════════════════════════════════════════
+    # WHAT / WAS
+    # ══════════════════════════════════════════════════
+    messages_section:
+      name: "💬 Messages / Texte"
+      icon: mdi:message-text
+      input:
+        announce_next_allowed:
+          name: "\"You may smoke again\" / „Du darfst wieder“"
+          default: true
+          selector:
+            boolean: {}
+        text_next_allowed:
+          name: "Text"
+          default: "You may smoke again."
+          selector:
+            text: {}
+        announce_count_check:
+          name: "\"Did you count them all?\" / „Hast du alle gezählt?“"
+          default: true
+          selector:
+            boolean: {}
+        text_count_check:
+          name: "Text"
+          default: "Did you count all your cigarettes?"
+          selector:
+            text: {}
+        announce_counted:
+          name: "Announce every cigarette / Jede Zigarette ansagen"
+          default: false
+          selector:
+            boolean: {}
+        text_counted:
+          name: "Text ({{ number }} = number today / Nummer heute)"
+          default: "Cigarette number {{ number }} counted."
+          selector:
+            text: {}
+
+    # ══════════════════════════════════════════════════
+    # TTS
+    # ══════════════════════════════════════════════════
+    tts_section:
+      name: "🔊 TTS"
+      icon: mdi:speaker
+      input:
+        enable_tts:
+          name: "🔊 TTS"
+          default: true
+          selector:
+            boolean: {}
+        tts_engine:
+          name: "🔊 TTS engine / TTS-Engine"
+          default: tts.piper
+          selector:
+            entity:
+              domain: tts
+        tts_media_player:
+          name: "📻 Media player / Media Player"
+          selector:
+            entity:
+              domain: media_player
+
+    # ══════════════════════════════════════════════════
+    # TELEGRAM
+    # ══════════════════════════════════════════════════
+    telegram_section:
+      name: "📲 Telegram"
+      icon: mdi:send
+      input:
+        enable_telegram:
+          name: "📲 Telegram"
+          default: true
+          selector:
+            boolean: {}
+        telegram_targets:
+          name: "📲 Recipients / Empfänger"
+          description: "notify entities. Empty = off. / notify-Entitäten, leer = aus."
+          default: []
+          selector:
+            entity:
+              domain: notify
+              multiple: true
+        telegram_night_mute:
+          name: "🌙 Telegram quiet at night / Telegram bei Nachtruhe stumm"
+          description: >
+            "Did you count them all?" can come every few minutes – on = no Telegram at night either.
+            / „Hast du alle gezählt?“ kommt alle paar Minuten – an = nachts auch kein Telegram.
+          default: true
+          selector:
+            boolean: {}
+
+    # ══════════════════════════════════════════════════
+    # QUIET TIMES / RUHEZEITEN
+    # ══════════════════════════════════════════════════
+    quiet_section:
+      name: "🌙 Quiet times / Ruhezeiten"
+      icon: mdi:weather-night
+      input:
+        night_schedule:
+          name: "🌙 Night schedule / Nachtruhe-Zeitplan"
+          description: "schedule helper; empty = none / Zeitplan-Helfer, leer = keiner"
+          default: ""
+          selector:
+            entity:
+              domain: schedule
+        person_trackers:
+          name: "👥 TTS only when someone is home / TTS nur wenn jemand zu Hause"
+          description: "Empty = always. / Leer = immer."
+          default: []
+          selector:
+            entity:
+              domain: person
+              multiple: true
+        do_not_disturb:
+          name: "🌙 Do-not-disturb switch / Bitte-nicht-stören-Schalter"
+          description: "'on' = no TTS; empty = none / 'on' = kein TTS, leer = keiner"
+          default: ""
+          selector:
+            entity:
+              domain:
+                - input_boolean
+                - switch
+                - binary_sensor
+
+# ══════════════════════════════════════════════════════
+mode: queued
+max: 10
+
+triggers:
+  - trigger: event
+    event_type: ciggie_counter_reminder
+    id: reminder
+  - trigger: event
+    event_type: ciggie_counter_counted
+    id: counted
+
+variables:
+  # first: the texts below are templates and may use {{ number }}
+  number: "{{ trigger.event.data.number if trigger.id == 'counted' else 0 }}"
+  v_next_allowed:    !input announce_next_allowed
+  v_count_check:     !input announce_count_check
+  v_counted:         !input announce_counted
+  v_text_next:       !input text_next_allowed
+  v_text_check:      !input text_count_check
+  v_text_counted:    !input text_counted
+  v_enable_tts:      !input enable_tts
+  v_enable_telegram: !input enable_telegram
+  v_tts_engine:      !input tts_engine
+  v_tts_player:      !input tts_media_player
+  v_telegram_tgts:   !input telegram_targets
+  v_tg_night_mute:   !input telegram_night_mute
+  v_night_schedule:  !input night_schedule
+  v_persons:         !input person_trackers
+  v_dnd:             !input do_not_disturb
+
+  kind: >
+    {{ trigger.event.data.type if trigger.id == 'reminder' else 'counted' }}
+  wanted: >
+    {{ (kind == 'next_allowed' and v_next_allowed)
+       or (kind == 'count_check' and v_count_check)
+       or (kind == 'counted' and v_counted and not trigger.event.data.muted) }}
+  msg: >
+    {% if kind == 'next_allowed' %}{{ v_text_next }}
+    {% elif kind == 'count_check' %}{{ v_text_check }}
+    {% else %}{{ v_text_counted }}{% endif %}
+
+  is_night: "{{ v_night_schedule != '' and is_state(v_night_schedule, 'on') }}"
+  someone_home: >
+    {{ v_persons | length == 0 or v_persons | select('is_state', 'home') | list | length > 0 }}
+  tts_allowed: >
+    {% set dnd = v_dnd != '' and is_state(v_dnd, 'on') %}
+    {{ v_enable_tts and not is_night and not dnd and someone_home }}
+  telegram_allowed: >
+    {{ v_enable_telegram and v_telegram_tgts | length > 0 and not (v_tg_night_mute and is_night) }}
+
+conditions:
+  - condition: template
+    value_template: "{{ wanted }}"
+
+actions:
+  # TTS – if the player fails, Telegram still goes out
+  - if:
+      - condition: template
+        value_template: "{{ tts_allowed }}"
+    then:
+      - action: tts.speak
+        continue_on_error: true
+        target:
+          entity_id: "{{ v_tts_engine }}"
+        data:
+          cache: false
+          media_player_entity_id: "{{ v_tts_player }}"
+          message: "{{ msg | trim }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ telegram_allowed }}"
+    then:
+      - repeat:
+          for_each: "{{ v_telegram_tgts }}"
+          sequence:
+            - action: notify.send_message
+              target:
+                entity_id: "{{ repeat.item }}"
+              data:
+                message: "🚬 {{ msg | trim }}"

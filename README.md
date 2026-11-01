@@ -51,7 +51,18 @@ Entity IDs follow your language; the table shows the English ones.
 | `ciggie_counter_reminder` | `type`: `next_allowed` or `count_check` (not fired while muted) |
 | `ciggie_counter_counted` | `number` (today), `source`, `timestamp`, `muted` – only for fresh entries, not for backfills |
 
-Example: speak the reminders.
+### Blueprint: TTS & Telegram
+
+The easiest way to hear the reminders: import the blueprint and create an automation from it.
+
+[![Open your Home Assistant instance and show the blueprint import dialog with this blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fgh0stless%2Fciggie-counter-ha%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fciggie_counter%2Fannounce.yaml)
+
+- "You may smoke again", "Did you count them all?" and optionally every counted cigarette ("Cigarette number 12 counted.") – texts configurable, e.g. in German
+- TTS engine and speaker of your choice, Telegram (or any notify entity) in parallel
+- quiet at night (schedule helper), with a do-not-disturb switch, TTS only when someone is home
+- silent while `switch.ciggie_counter_mute_reminders` is on
+
+Or by hand – example: speak the reminders.
 
 ```yaml
 automation:

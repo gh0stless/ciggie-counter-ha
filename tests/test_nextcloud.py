@@ -31,6 +31,7 @@ async def _setup(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> Mo
     aioclient_mock.get(f"{API}/mute", json={"muted": False})
     aioclient_mock.post(f"{API}/v2/entries", json={"rev": 6, "accepted": 1})
     aioclient_mock.post(f"{API}/mute", json={"muted": True})
+    aioclient_mock.get(f"{API}/ashtray", json={"battery": 87, "firmware": "0.4", "updatedAt": "2026-11-01T08:00:00+00:00"})
     options = dict(DEFAULTS) | {CONF_NC_URL: NC, CONF_NC_USER: "andreas", CONF_NC_PASSWORD: "secret"}
     entry = MockConfigEntry(domain=DOMAIN, data={}, options=options)
     entry.add_to_hass(hass)
@@ -45,6 +46,7 @@ async def test_first_sync_takes_over_server(hass: HomeAssistant, aioclient_mock:
     assert len(counter.active) == 5
     assert counter.hub_rev == 5
     assert counter.dirty_records() == []  # nothing from Nextcloud is sent back
+    assert counter.ashtray["battery"] == 87  # Butt Bin battery reported by the phone
     calls = [(m, str(u)) for m, u, *_ in aioclient_mock.mock_calls]
     assert ("GET", f"{API}/v2/entries?since=0") in calls
     assert not any(m == "POST" and u.endswith("/v2/entries") for m, u in calls)
@@ -111,6 +113,7 @@ async def test_options_flow_checks_nextcloud(hass: HomeAssistant, aioclient_mock
     aioclient_mock.clear_requests()
     aioclient_mock.get(f"{API}/v2/entries", json={"rev": 0, "entries": []})
     aioclient_mock.get(f"{API}/mute", json={"muted": False})
+    aioclient_mock.get(f"{API}/ashtray", json={"battery": None, "updatedAt": None})
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], base | {CONF_NC_URL: NC, CONF_NC_USER: "andreas", CONF_NC_PASSWORD: "right"}
     )

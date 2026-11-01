@@ -17,6 +17,7 @@ import aiohttp
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.debounce import Debouncer
+from homeassistant.util import dt as dt_util
 
 from .counter import CiggieCounter
 
@@ -77,6 +78,13 @@ class NextcloudSync:
             else:
                 remote = await self._request("GET", "/mute")
                 counter.async_set_muted(bool(remote.get("muted")), from_hub=True)
+
+            # Butt Bin state (battery …): the phone reports it to Nextcloud, take it over if newer
+            remote_ashtray = await self._request("GET", "/ashtray")
+            remote_at = dt_util.parse_datetime(str(remote_ashtray.get("updatedAt") or ""))
+            local_at = dt_util.parse_datetime(str(counter.ashtray.get("updatedAt") or ""))
+            if remote_at is not None and (local_at is None or remote_at > local_at):
+                counter.async_update_ashtray(remote_ashtray, remote_at, from_hub=True)
 
             changes = await self._request("GET", "/v2/entries", params={"since": str(counter.hub_rev)})
             counter.async_merge(changes.get("entries", []), source="nextcloud", from_hub=True)

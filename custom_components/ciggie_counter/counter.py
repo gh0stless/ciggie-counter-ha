@@ -350,7 +350,9 @@ class CiggieCounter:
             self._changed(local=not from_hub)
 
     @callback
-    def async_update_ashtray(self, values: dict[str, Any], at: datetime | None = None) -> dict[str, Any]:
+    def async_update_ashtray(
+        self, values: dict[str, Any], at: datetime | None = None, from_hub: bool = False
+    ) -> dict[str, Any]:
         """Partial update; only known fields, wrong types are ignored."""
         for key, kind in ASHTRAY_FIELDS.items():
             if key not in values or values[key] == "":
@@ -366,7 +368,7 @@ class CiggieCounter:
         if self.ashtray["battery"] is not None:
             self.ashtray["battery"] = max(0, min(100, self.ashtray["battery"]))
         self.ashtray["updatedAt"] = (at or dt_util.now()).isoformat()
-        self._changed()
+        self._changed(local=not from_hub)
         return self.ashtray
 
     # ------------------------------------------------------------------ reminders
