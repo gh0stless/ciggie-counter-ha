@@ -39,6 +39,67 @@ Manual: copy `custom_components/ciggie_counter` to `config/custom_components/`.
 
 Entity IDs follow your language; the table shows the English ones.
 
+### Dashboard example
+
+Only built-in cards. Dashboard → ✏️ → *Add card* → *Manual*, paste, adjust the entity IDs if yours are German:
+
+```yaml
+type: vertical-stack
+cards:
+  - type: tile
+    entity: button.ciggie_counter_count_cigarette
+    name: Count one
+    icon: mdi:smoking
+    tap_action:
+      action: perform-action
+      perform_action: button.press
+      target:
+        entity_id: button.ciggie_counter_count_cigarette
+  - type: glance
+    entities:
+      - entity: sensor.ciggie_counter_today
+        name: Today
+      - entity: sensor.ciggie_counter_yesterday
+        name: Yesterday
+      - entity: sensor.ciggie_counter_cost_today
+        name: Cost
+      - entity: binary_sensor.ciggie_counter_allowed
+        name: Allowed
+  - type: entities
+    entities:
+      - entity: sensor.ciggie_counter_next_allowed
+        name: Next allowed
+        format: relative
+      - entity: sensor.ciggie_counter_last_cigarette
+        name: Last one
+        format: relative
+      - entity: sensor.ciggie_counter_break
+        name: Break
+      - entity: switch.ciggie_counter_mute_reminders
+        name: Mute reminders
+      - entity: sensor.ciggie_counter_butt_bin_battery
+        name: Butt Bin battery
+  - type: statistics-graph
+    title: Last 30 days
+    entities:
+      - sensor.ciggie_counter_today
+    stat_types:
+      - max
+    period: day
+    days_to_show: 30
+    chart_type: bar
+  - type: button
+    name: Delete last
+    icon: mdi:undo
+    tap_action:
+      action: perform-action
+      perform_action: ciggie_counter.delete_last
+      confirmation:
+        text: Delete the last cigarette?
+```
+
+The daily bar chart needs long-term statistics for `sensor.ciggie_counter_today`; it fills from the day you install the integration.
+
 ## Actions
 
 - `ciggie_counter.count` – optional `timestamp` (for a cigarette you forgot) and `source`
