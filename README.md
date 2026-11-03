@@ -183,13 +183,14 @@ Optional, under *Configure*: Nextcloud address, user and an **app password** (Ne
 - The first sync takes over all entries from Nextcloud.
 - Then every 5 minutes and shortly after every change: Home Assistant sends its own new entries and deletions (and those it got from a phone) and fetches only what changed on Nextcloud.
 - The mute switch is synced too.
+- The **rules** are synced as well (Nextcloud app 0.11.0 or newer): cost, start of day, break mode, daily target, wake hours, fixed minutes and the count reminder interval. The latest change wins, wherever it was made. How each device reminds you (notification, push, announcement) stays separate.
 - `sensor.ciggie_counter_last_nextcloud_sync` (diagnostic, disabled by default) shows the last successful sync; failures are logged.
 
 Entries that reach Home Assistant from Nextcloud fire `ciggie_counter_counted` as well (if they are fresh). If Nextcloud already announces via its own webhook, use one of the two for announcements.
 
 ## Sync with the Android app
 
-The Android app can use Home Assistant instead of (or besides) Nextcloud: enter your Home Assistant URL (also from outside, e.g. Nabu Casa or your own domain) and a **long-lived access token** (your profile → Security). *Supported from Android app version 1.0.7.*
+The Android app can use Home Assistant instead of (or besides) Nextcloud: enter your Home Assistant URL (also from outside, e.g. Nabu Casa or your own domain) and a **long-lived access token** (your profile → Security). *Supported from Android app version 1.0.7; from 1.0.13 the rules are synced too, the latest change wins.*
 
 > **A small piece of unsolicited advice 🤓:** your phone does not belong in your home network. It runs dozens of apps you cannot look into, so put it in the **guest Wi-Fi** and keep your servers, NAS and smart home in the main network. Ciggie Counter is built for that: the phone talks to Home Assistant or Nextcloud over **HTTPS** like any other device on the internet – no open ports towards the phone, no local network access needed.
 

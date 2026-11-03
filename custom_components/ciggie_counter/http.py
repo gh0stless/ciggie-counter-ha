@@ -10,6 +10,8 @@ Base path: /api/ciggie_counter
   POST /mute              muted=1|0 (form or JSON) -> {"muted": bool}
   GET  /ashtray           Butt Bin device state
   POST /ashtray           partial update (form or JSON), optional "at"
+  GET  /v2/settings       rules (cost, breaks, …) with "updatedAt"
+  POST /v2/settings       JSON rules, taken over if "updatedAt" is newer -> current rules
 """
 
 from __future__ import annotations
@@ -31,7 +33,7 @@ BASE = f"/api/{DOMAIN}"
 
 @callback
 def async_register_views(hass: HomeAssistant) -> None:
-    for view in (TodayView, EntriesView, MuteView, AshtrayView):
+    for view in (TodayView, EntriesView, MuteView, AshtrayView, SettingsView):
         hass.http.register_view(view())
 
 
@@ -123,3 +125,19 @@ class AshtrayView(_Base):
         params = await _params(request)
         at = dt_util.parse_datetime(str(params.get("at", ""))) if params.get("at") else None
         return self.json(counter.async_update_ashtray(params, at))
+
+
+class SettingsView(_Base):
+    url = f"{BASE}/v2/settings"
+    name = f"api:{DOMAIN}:settings"
+
+    async def get(self, request: web.Request) -> web.Response:
+        if (counter := _counter(request)) is None:
+            return self.unavailable()
+        return self.json(counter.rules())
+
+    async def post(self, request: web.Request) -> web.Response:
+        if (counter := _counter(request)) is None:
+            return self.unavailable()
+        counter.async_apply_rules(await _params(request))
+        return self.json(counter.rules())

@@ -11,7 +11,17 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.ciggie_counter.const import CONF_NC_PASSWORD, CONF_NC_URL, CONF_NC_USER, DEFAULTS, DOMAIN
+from custom_components.ciggie_counter.const import (
+    CONF_DAILY_TARGET,
+    CONF_FIXED_MINUTES,
+    CONF_INTERVAL_MODE,
+    CONF_NC_PASSWORD,
+    CONF_NC_URL,
+    CONF_NC_USER,
+    CONF_RULES_UPDATED_AT,
+    DEFAULTS,
+    DOMAIN,
+)
 from custom_components.ciggie_counter.nextcloud import NextcloudSync
 
 NC = "https://cloud.example.org"
@@ -26,13 +36,21 @@ def _server_records(n: int) -> list[dict[str, Any]]:
     ]
 
 
-async def _setup(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> MockConfigEntry:
+NO_RULES = {"updatedAt": 0}
+
+
+async def _setup(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker,
+    rules: dict[str, Any] = NO_RULES, extra: dict[str, Any] | None = None,
+) -> MockConfigEntry:
     aioclient_mock.get(f"{API}/v2/entries", json={"rev": 5, "entries": _server_records(5)})
+    aioclient_mock.get(f"{API}/v2/settings", json=rules)
+    aioclient_mock.post(f"{API}/v2/settings", json=rules)
     aioclient_mock.get(f"{API}/mute", json={"muted": False})
     aioclient_mock.post(f"{API}/v2/entries", json={"rev": 6, "accepted": 1})
     aioclient_mock.post(f"{API}/mute", json={"muted": True})
     aioclient_mock.get(f"{API}/ashtray", json={"battery": 87, "firmware": "0.4", "updatedAt": "2026-11-01T08:00:00+00:00"})
-    options = dict(DEFAULTS) | {CONF_NC_URL: NC, CONF_NC_USER: "andreas", CONF_NC_PASSWORD: "secret"}
+    options = dict(DEFAULTS) | {CONF_NC_URL: NC, CONF_NC_USER: "andreas", CONF_NC_PASSWORD: "secret"} | (extra or {})
     entry = MockConfigEntry(domain=DOMAIN, data={}, options=options)
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -114,7 +132,35 @@ async def test_options_flow_checks_nextcloud(hass: HomeAssistant, aioclient_mock
     aioclient_mock.get(f"{API}/v2/entries", json={"rev": 0, "entries": []})
     aioclient_mock.get(f"{API}/mute", json={"muted": False})
     aioclient_mock.get(f"{API}/ashtray", json={"battery": None, "updatedAt": None})
+    aioclient_mock.get(f"{API}/v2/settings", status=404)  # Nextcloud app before 0.11.0
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], base | {CONF_NC_URL: NC, CONF_NC_USER: "andreas", CONF_NC_PASSWORD: "right"}
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
+
+
+async def test_newer_rules_from_nextcloud_are_taken(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    rules = {"updatedAt": 1_900_000_000, "costPerCigarette": 0.4, "dayStartHour": 4, "intervalMode": "fixed",
+             "dailyTarget": None, "wakeHours": 17.5, "fixedIntervalMinutes": 45, "countCheckIntervalMinutes": 20}
+    entry = await _setup(hass, aioclient_mock, rules)
+    counter = entry.runtime_data
+    assert counter.options[CONF_INTERVAL_MODE] == "fixed"
+    assert counter.options[CONF_FIXED_MINUTES] == 45
+    assert counter.day_start_hour == 4
+    assert counter.rules_updated_at == 1_900_000_000
+    await hass.async_block_till_done()
+    # stored in the options, without reloading the entry (same counter object)
+    assert entry.options[CONF_RULES_UPDATED_AT] == 1_900_000_000
+    assert CONF_DAILY_TARGET not in entry.options
+    assert entry.runtime_data is counter
+    assert not any(c[0] == "POST" and str(c[1]).endswith("/v2/settings") for c in aioclient_mock.mock_calls)
+
+
+async def test_own_newer_rules_go_to_nextcloud(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    entry = await _setup(hass, aioclient_mock, {"updatedAt": 100},
+                         {CONF_RULES_UPDATED_AT: 200, CONF_DAILY_TARGET: 12})
+    posts = [c for c in aioclient_mock.mock_calls if c[0] == "POST" and str(c[1]).endswith("/v2/settings")]
+    assert len(posts) == 1
+    sent = posts[0][2]
+    assert sent["updatedAt"] == 200 and sent["dailyTarget"] == 12 and sent["intervalMode"] == "computed"
+    assert entry.runtime_data.options[CONF_DAILY_TARGET] == 12

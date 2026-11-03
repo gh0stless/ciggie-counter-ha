@@ -79,6 +79,8 @@ class NextcloudSync:
                 remote = await self._request("GET", "/mute")
                 counter.async_set_muted(bool(remote.get("muted")), from_hub=True)
 
+            await self._sync_rules()
+
             # Butt Bin state (battery …): the phone reports it to Nextcloud, take it over if newer
             remote_ashtray = await self._request("GET", "/ashtray")
             remote_at = dt_util.parse_datetime(str(remote_ashtray.get("updatedAt") or ""))
@@ -89,6 +91,20 @@ class NextcloudSync:
             changes = await self._request("GET", "/v2/entries", params={"since": str(counter.hub_rev)})
             counter.async_merge(changes.get("entries", []), source="nextcloud", from_hub=True)
             counter.async_hub_synced(int(changes.get("rev", counter.hub_rev)))
+
+    async def _sync_rules(self) -> None:
+        """Rules (cost, breaks, …) from Nextcloud app 0.11.0 on: the latest change wins."""
+        try:
+            remote = await self._request("GET", "/v2/settings")
+        except NextcloudError as err:
+            if str(err) == "app_missing":
+                return  # older Nextcloud app: rules stay local
+            raise
+        remote_at = int(remote.get("updatedAt") or 0)
+        if remote_at > self.counter.rules_updated_at:
+            self.counter.async_apply_rules(remote, from_hub=True)
+        elif self.counter.rules_updated_at > remote_at:
+            await self._request("POST", "/v2/settings", json=self.counter.rules())
 
     async def async_sync_quietly(self) -> None:
         """Timer and after changes: errors are logged, the next run tries again."""

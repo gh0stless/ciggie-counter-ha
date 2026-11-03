@@ -24,6 +24,8 @@ CONF_COUNT_SOURCES: Final = "count_sources"
 CONF_NC_URL: Final = "nextcloud_url"
 CONF_NC_USER: Final = "nextcloud_user"
 CONF_NC_PASSWORD: Final = "nextcloud_app_password"
+# last change of the rules below (Unix seconds, 0 = never); synced with Nextcloud and the phone
+CONF_RULES_UPDATED_AT: Final = "rules_updated_at"
 
 MODE_COMPUTED: Final = "computed"
 MODE_FIXED: Final = "fixed"
@@ -37,6 +39,18 @@ DEFAULTS: Final[dict] = {
     CONF_COUNT_CHECK_REMINDER: False,
     CONF_COUNT_CHECK_MINUTES: 10,
     CONF_COUNT_SOURCES: [],
+}
+
+# Rules that are the same on all devices (sync /v2/settings): API name -> option.
+# How each device reminds (notification, push, TTS) stays local and is not part of it.
+RULE_KEYS: Final[dict[str, str]] = {
+    "costPerCigarette": CONF_COST,
+    "dayStartHour": CONF_DAY_START_HOUR,
+    "intervalMode": CONF_INTERVAL_MODE,
+    "dailyTarget": CONF_DAILY_TARGET,
+    "wakeHours": CONF_WAKE_HOURS,
+    "fixedIntervalMinutes": CONF_FIXED_MINUTES,
+    "countCheckIntervalMinutes": CONF_COUNT_CHECK_MINUTES,
 }
 
 # Entities that can count a cigarette when they fire (Zigbee buttons, contacts, ...)

@@ -135,6 +135,11 @@ def _source_listener(counter: CiggieCounter):
 
 
 async def _options_updated(hass: HomeAssistant, entry: CiggieConfigEntry) -> None:
+    counter = entry.runtime_data
+    if counter.applying_rules:
+        # rules from another device: the counter already uses them, no reload needed
+        counter.applying_rules = False
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 

@@ -27,7 +27,9 @@ from custom_components.ciggie_counter.const import (
     CONF_DAY_START_HOUR,
     CONF_FIXED_MINUTES,
     CONF_INTERVAL_MODE,
+    CONF_RULES_UPDATED_AT,
     CONF_WAKE_HOURS,
+    DEFAULTS,
     DOMAIN,
     EVENT_COUNTED,
     EVENT_REMINDER,
@@ -283,3 +285,34 @@ async def test_own_button_is_no_count_source(hass: HomeAssistant, options: dict[
     await hass.async_block_till_done()
     await _press(hass)
     assert len(config_entry.runtime_data.active) == 1
+
+
+async def test_rules_api(hass: HomeAssistant, entry: MockConfigEntry, hass_client) -> None:
+    """The phone (Home Assistant as sync target) exchanges the rules like with Nextcloud."""
+    client = await hass_client()
+    resp = await client.get("/api/ciggie_counter/v2/settings")
+    assert (await resp.json())["updatedAt"] == 0
+
+    resp = await client.post("/api/ciggie_counter/v2/settings", json={
+        "updatedAt": 1_900_000_000, "intervalMode": "off", "dayStartHour": 3, "countCheckIntervalMinutes": 15})
+    data = await resp.json()
+    assert data["updatedAt"] == 1_900_000_000 and data["intervalMode"] == "off" and data["dayStartHour"] == 3
+    assert data["dailyTarget"] is None
+    counter = entry.runtime_data
+    assert counter.day_start_hour == 3
+
+    # older rules are ignored, the answer is the valid state
+    resp = await client.post("/api/ciggie_counter/v2/settings", json={"updatedAt": 5, "intervalMode": "fixed"})
+    assert (await resp.json())["intervalMode"] == "off"
+
+
+async def test_options_flow_marks_rule_changes(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    base = {k: v for k, v in DEFAULTS.items() if k != "count_sources"}
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], base)
+    assert result["data"][CONF_RULES_UPDATED_AT] == 0  # nothing changed
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(result["flow_id"], base | {CONF_DAILY_TARGET: 10})
+    assert result["data"][CONF_RULES_UPDATED_AT] > 1_700_000_000

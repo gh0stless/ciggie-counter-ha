@@ -28,7 +28,12 @@ from .const import (
     CONF_FIXED_MINUTES,
     CONF_INTERVAL_MODE,
     CONF_NEXT_ALLOWED_REMINDER,
+    CONF_RULES_UPDATED_AT,
     CONF_WAKE_HOURS,
+    MODE_COMPUTED,
+    MODE_FIXED,
+    MODE_OFF,
+    RULE_KEYS,
     DEFAULTS,
     DOMAIN,
     EVENT_COUNTED,
@@ -58,12 +63,32 @@ def _parse(ts: str) -> datetime | None:
     return parsed
 
 
+
+def _rule_value(key: str, value: Any) -> Any:
+    """A rule as clean JSON value: None for "not set", numbers as int or float."""
+    if value is None or value == "":
+        return None
+    try:
+        if key == CONF_INTERVAL_MODE:
+            return value if value in (MODE_COMPUTED, MODE_FIXED, MODE_OFF) else MODE_COMPUTED
+        if key in (CONF_COST, CONF_WAKE_HOURS):
+            return float(value)
+        number = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    if key == CONF_DAY_START_HOUR:
+        return number if 0 <= number <= 23 else None
+    return number if number > 0 else None
+
 class CiggieCounter:
     """All data of one Ciggie Counter instance."""
 
     def __init__(self, hass: HomeAssistant, entry_id: str, options: dict[str, Any]) -> None:
         self.hass = hass
+        self.entry_id = entry_id
         self.options: dict[str, Any] = {**DEFAULTS, **options}
+        # set while rules from another device are written to the options: no reload then
+        self.applying_rules = False
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}")
         self.rev = 0
         self.records: list[dict[str, Any]] = []
@@ -122,6 +147,48 @@ class CiggieCounter:
 
     async def async_flush(self) -> None:
         await self._store.async_save(self._data())
+
+    # ------------------------------------------------------------------ rules
+
+    @property
+    def rules_updated_at(self) -> int:
+        return int(self.options.get(CONF_RULES_UPDATED_AT) or 0)
+
+    def rules(self) -> dict[str, Any]:
+        """The rules in the format of /v2/settings (Nextcloud app 0.11.0, Android 1.0.13)."""
+        out: dict[str, Any] = {"updatedAt": self.rules_updated_at}
+        for api, key in RULE_KEYS.items():
+            out[api] = _rule_value(key, self.options.get(key))
+        return out
+
+    @callback
+    def async_apply_rules(self, rules: dict[str, Any], from_hub: bool = False) -> bool:
+        """Take over the rules of another device if they are newer. A rule that is missing or
+        empty means "not set". Rules from a phone (from_hub False) go on to Nextcloud."""
+        try:
+            at = int(rules.get("updatedAt") or 0)
+        except (TypeError, ValueError):
+            return False
+        if at <= self.rules_updated_at:
+            return False
+        changes: dict[str, Any] = {CONF_RULES_UPDATED_AT: at}
+        for api, key in RULE_KEYS.items():
+            changes[key] = _rule_value(key, rules.get(api))
+        self.options = {**self.options, **changes}
+        for key, value in changes.items():
+            if value is None:
+                self.options[key] = DEFAULTS.get(key)
+
+        entry = self.hass.config_entries.async_get_entry(self.entry_id)
+        if entry is not None:
+            options = {**entry.options, **changes}
+            for key, value in changes.items():
+                if value is None:
+                    options.pop(key, None)
+            self.applying_rules = True
+            self.hass.config_entries.async_update_entry(entry, options=options)
+        self._changed(local=not from_hub)
+        return True
 
     # ------------------------------------------------------------------ days
 

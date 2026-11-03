@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import voluptuous as vol
@@ -24,6 +25,7 @@ from .const import (
     CONF_NC_URL,
     CONF_NC_USER,
     CONF_NEXT_ALLOWED_REMINDER,
+    CONF_RULES_UPDATED_AT,
     CONF_WAKE_HOURS,
     COUNT_SOURCE_DOMAINS,
     DEFAULTS,
@@ -32,6 +34,7 @@ from .const import (
     MODE_FIXED,
     MODE_OFF,
     NAME,
+    RULE_KEYS,
 )
 
 
@@ -69,6 +72,13 @@ class CiggieOptionsFlow(OptionsFlow):
                     except NextcloudError as err:
                         errors["base"] = str(err)
             if not errors:
+                # rules changed here: from now on they apply to the other devices too
+                old = {**DEFAULTS, **self.config_entry.options}
+                new = {**DEFAULTS, **user_input}
+                changed = any(old.get(key) != new.get(key) for key in RULE_KEYS.values())
+                user_input[CONF_RULES_UPDATED_AT] = (
+                    int(time.time()) if changed else int(old.get(CONF_RULES_UPDATED_AT) or 0)
+                )
                 return self.async_create_entry(data=user_input)
 
         o = {**DEFAULTS, **self.config_entry.options, **(user_input or {})}
