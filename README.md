@@ -163,7 +163,7 @@ automation:
 
 ## The Butt Bin
 
-![Butt Bin design study: a brushed steel ashtray with a clear plunger knob and a ring of LEDs](images/butt-bin.jpg)
+![Butt Bin in three colour schemes: a spin ashtray with a printed knob on its plunger, a light ring and an arcade button on top](images/butt-bin.jpg)
 
 *Design study (AI render). The prototype is being built.*
 
