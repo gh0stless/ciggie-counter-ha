@@ -270,10 +270,29 @@ class CiggieCounter:
         return seconds_left / remaining / 60
 
     def next_allowed(self, now: datetime | None = None) -> datetime | None:
+        """From when the next cigarette is allowed.
+
+        computed: the break shrinks over time (less waking time left), so "last + current
+        break" moves. Allowed is the point where they meet: t = (last * rest + day end) / (rest + 1),
+        the same fixed time as in the Android and Nextcloud apps.
+        """
         minutes = self.interval_minutes(now)
-        if minutes is None or self.last is None:
+        last = self.last
+        if minutes is None or last is None:
             return None
-        return self.last + timedelta(seconds=round(minutes * 60))
+        if self.options.get(CONF_INTERVAL_MODE) == MODE_COMPUTED:
+            now = now or dt_util.now()
+            target = int(self.options[CONF_DAILY_TARGET])
+            wake = timedelta(hours=float(self.options.get(CONF_WAKE_HOURS) or 18.0))
+            today = self.on_day(self.today(now))
+            if not today:
+                return last + wake / target
+            remaining = max(target - len(today), 1)
+            day_end = today[0] + wake
+            if day_end <= now:
+                return last + timedelta(seconds=60 / remaining)
+            return last + (day_end - last) / (remaining + 1)
+        return last + timedelta(seconds=round(minutes * 60))
 
     # ------------------------------------------------------------------ counting
 

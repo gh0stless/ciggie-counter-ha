@@ -200,6 +200,28 @@ async def test_computed_break(hass: HomeAssistant, options: dict[str, Any], free
     assert counter.interval_minutes() == pytest.approx(18 * 60 / 15)
 
 
+async def test_computed_next_allowed_is_fixed(
+    hass: HomeAssistant, options: dict[str, Any], freezer: FrozenDateTimeFactory
+) -> None:
+    """The shown time does not move: it is where last + shrinking break meets the clock."""
+    freezer.move_to("2026-11-01T08:00:00+01:00")
+    options.update({CONF_INTERVAL_MODE: MODE_COMPUTED, CONF_DAILY_TARGET: 3, CONF_WAKE_HOURS: 4})
+    config_entry = MockConfigEntry(domain=DOMAIN, data={}, options=options)
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    counter = config_entry.runtime_data
+
+    await _press(hass)  # 08:00, day ends 12:00, 2 left -> (08:00 * 2 + 12:00) / 3 = 09:20
+    expected = dt_util.parse_datetime("2026-11-01T09:20:00+01:00")
+    assert counter.next_allowed() == expected
+    freezer.move_to("2026-11-01T09:00:00+01:00")
+    assert counter.next_allowed() == expected  # same time later on
+    freezer.move_to("2026-11-01T09:20:00+01:00")
+    # at that time the moving "last + break" meets it as well
+    assert counter.last + timedelta(minutes=counter.interval_minutes()) == expected
+
+
 async def test_day_start_hour(hass: HomeAssistant, options: dict[str, Any], freezer: FrozenDateTimeFactory) -> None:
     freezer.move_to("2026-11-02T01:30:00+01:00")
     options[CONF_DAY_START_HOUR] = 4
