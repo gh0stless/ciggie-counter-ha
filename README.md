@@ -186,7 +186,7 @@ Optional, under *Configure*: Nextcloud address, user and an **app password** (Ne
 - The **rules** are synced as well (Nextcloud app 0.11.0 or newer): cost, start of day, break mode, daily target, wake hours, fixed minutes and the count reminder interval. The latest change wins, wherever it was made. How each device reminds you (notification, push, announcement) stays separate.
 - `sensor.ciggie_counter_last_nextcloud_sync` (diagnostic, disabled by default) shows the last successful sync; failures are logged.
 
-Entries that reach Home Assistant from Nextcloud fire `ciggie_counter_counted` as well (if they are fresh). If Nextcloud already announces via its own webhook, use one of the two for announcements.
+Entries that reach Home Assistant from Nextcloud fire `ciggie_counter_counted` as well (if they are fresh).
 
 ## Sync with the Android app
 
