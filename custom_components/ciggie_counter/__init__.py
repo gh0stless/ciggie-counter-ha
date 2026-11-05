@@ -15,12 +15,23 @@ from homeassistant.helpers.event import async_track_state_change_event, async_tr
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_COUNT_SOURCES, CONF_NC_PASSWORD, CONF_NC_URL, CONF_NC_USER, DOMAIN
+from .const import (
+    CONF_COUNT_SOURCES,
+    CONF_NC_PASSWORD,
+    CONF_NC_URL,
+    CONF_NC_USER,
+    CONF_RULES_UPDATED_AT,
+    DEFAULTS,
+    DOMAIN,
+    RULE_KEYS,
+)
 from .counter import CiggieCounter
 from .http import async_register_views
 from .nextcloud import INTERVAL, NextcloudSync
 
 _LOGGER = logging.getLogger(__name__)
+
+_RULE_OPTIONS = {*RULE_KEYS.values(), CONF_RULES_UPDATED_AT}
 
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SENSOR, Platform.SWITCH]
 
@@ -134,11 +145,15 @@ def _source_listener(counter: CiggieCounter):
     return handle
 
 
+def _without_rules(options: dict) -> dict:
+    return {k: v for k, v in {**DEFAULTS, **options}.items() if k not in _RULE_OPTIONS}
+
+
 async def _options_updated(hass: HomeAssistant, entry: CiggieConfigEntry) -> None:
     counter = entry.runtime_data
-    if counter.applying_rules:
-        # rules from another device: the counter already uses them, no reload needed
-        counter.applying_rules = False
+    if _without_rules(entry.options) == _without_rules(counter.options):
+        # only the rules changed (options flow or another device): no reload needed
+        counter.async_use_options(dict(entry.options))
         return
     await hass.config_entries.async_reload(entry.entry_id)
 

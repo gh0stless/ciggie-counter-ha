@@ -139,5 +139,11 @@ class SettingsView(_Base):
     async def post(self, request: web.Request) -> web.Response:
         if (counter := _counter(request)) is None:
             return self.unavailable()
-        counter.async_apply_rules(await _params(request))
+        try:
+            params = await _params(request)
+        except ValueError:
+            return self.json_message("JSON body expected", HTTPStatus.BAD_REQUEST)
+        if "updatedAt" not in params:
+            return self.json_message("updatedAt missing", HTTPStatus.BAD_REQUEST)
+        counter.async_apply_rules(params)
         return self.json(counter.rules())

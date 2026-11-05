@@ -76,9 +76,9 @@ class CiggieOptionsFlow(OptionsFlow):
                 old = {**DEFAULTS, **self.config_entry.options}
                 new = {**DEFAULTS, **user_input}
                 changed = any(old.get(key) != new.get(key) for key in RULE_KEYS.values())
-                user_input[CONF_RULES_UPDATED_AT] = (
-                    int(time.time()) if changed else int(old.get(CONF_RULES_UPDATED_AT) or 0)
-                )
+                stored = int(old.get(CONF_RULES_UPDATED_AT) or 0)
+                # never older than the stored rules, which may come from a device whose clock is ahead
+                user_input[CONF_RULES_UPDATED_AT] = max(int(time.time()), stored + 1) if changed else stored
                 return self.async_create_entry(data=user_input)
 
         o = {**DEFAULTS, **self.config_entry.options, **(user_input or {})}

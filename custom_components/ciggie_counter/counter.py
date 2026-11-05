@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from datetime import date, datetime, timedelta
 import logging
+import math
 from typing import Any
 import uuid
 
@@ -30,18 +31,16 @@ from .const import (
     CONF_NEXT_ALLOWED_REMINDER,
     CONF_RULES_UPDATED_AT,
     CONF_WAKE_HOURS,
-    MODE_COMPUTED,
-    MODE_FIXED,
-    MODE_OFF,
-    RULE_KEYS,
     DEFAULTS,
     DOMAIN,
     EVENT_COUNTED,
     EVENT_REMINDER,
+    MODE_COMPUTED,
     MODE_FIXED,
     MODE_OFF,
     REMINDER_COUNT_CHECK,
     REMINDER_NEXT_ALLOWED,
+    RULE_KEYS,
     SIGNAL_UPDATE,
     STORAGE_VERSION,
 )
@@ -63,22 +62,33 @@ def _parse(ts: str) -> datetime | None:
     return parsed
 
 
+def _number(value: Any) -> float | None:
+    """A finite number from JSON or a form, None otherwise (also for NaN and infinity)."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) else None
+
 
 def _rule_value(key: str, value: Any) -> Any:
-    """A rule as clean JSON value: None for "not set", numbers as int or float."""
+    """A rule as clean JSON value: None for "not set" or out of range, numbers as int or float."""
     if value is None or value == "":
         return None
-    try:
-        if key == CONF_INTERVAL_MODE:
-            return value if value in (MODE_COMPUTED, MODE_FIXED, MODE_OFF) else MODE_COMPUTED
-        if key in (CONF_COST, CONF_WAKE_HOURS):
-            return float(value)
-        number = int(float(value))
-    except (TypeError, ValueError):
+    if key == CONF_INTERVAL_MODE:
+        return value if value in (MODE_COMPUTED, MODE_FIXED, MODE_OFF) else MODE_COMPUTED
+    number = _number(value)
+    if number is None:
         return None
+    if key == CONF_COST:
+        return number if 0 <= number <= 100 else None
+    if key == CONF_WAKE_HOURS:
+        return number if 1 <= number <= 24 else None
     if key == CONF_DAY_START_HOUR:
-        return number if 0 <= number <= 23 else None
-    return number if number > 0 else None
+        return int(number) if 0 <= number <= 23 else None
+    # daily target, fixed minutes, count reminder interval
+    return int(number) if 1 <= number <= 1440 else None
+
 
 class CiggieCounter:
     """All data of one Ciggie Counter instance."""
@@ -87,8 +97,6 @@ class CiggieCounter:
         self.hass = hass
         self.entry_id = entry_id
         self.options: dict[str, Any] = {**DEFAULTS, **options}
-        # set while rules from another device are written to the options: no reload then
-        self.applying_rules = False
         self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}")
         self.rev = 0
         self.records: list[dict[str, Any]] = []
@@ -165,10 +173,10 @@ class CiggieCounter:
     def async_apply_rules(self, rules: dict[str, Any], from_hub: bool = False) -> bool:
         """Take over the rules of another device if they are newer. A rule that is missing or
         empty means "not set". Rules from a phone (from_hub False) go on to Nextcloud."""
-        try:
-            at = int(rules.get("updatedAt") or 0)
-        except (TypeError, ValueError):
+        stamp = _number(rules.get("updatedAt"))
+        if stamp is None:
             return False
+        at = int(stamp)
         if at <= self.rules_updated_at:
             return False
         changes: dict[str, Any] = {CONF_RULES_UPDATED_AT: at}
@@ -185,7 +193,7 @@ class CiggieCounter:
             for key, value in changes.items():
                 if value is None:
                     options.pop(key, None)
-            self.applying_rules = True
+            # only rules change: the update listener sees that and does not reload the entry
             self.hass.config_entries.async_update_entry(entry, options=options)
         self._changed(local=not from_hub)
         return True
@@ -467,8 +475,10 @@ class CiggieCounter:
 
         if self.options.get(CONF_NEXT_ALLOWED_REMINDER):
             nxt = self.next_allowed(now)
-            if nxt is not None and nxt <= now:
-                key = nxt.isoformat()
+            if nxt is not None and nxt <= now and self.last is not None:
+                # once per break: keyed on the last cigarette, not on the time (that can jump,
+                # e.g. when the waking time is over)
+                key = self.last.isoformat()
                 if self._last_notified_for != key:
                     # once per break; a break that ended long ago (restart) is not announced
                     self._last_notified_for = key
@@ -491,6 +501,12 @@ class CiggieCounter:
         if dirty:
             self._store.async_delay_save(self._data, 1)
         async_dispatcher_send(self.hass, SIGNAL_UPDATE)
+
+    @callback
+    def async_use_options(self, options: dict[str, Any]) -> None:
+        """New options that need no reload (only the rules changed): use them right away."""
+        self.options = {**DEFAULTS, **options}
+        self._changed(local=False)
 
     @callback
     def _remind(self, kind: str) -> None:

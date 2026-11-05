@@ -338,3 +338,26 @@ async def test_options_flow_marks_rule_changes(hass: HomeAssistant, entry: MockC
     result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(result["flow_id"], base | {CONF_DAILY_TARGET: 10})
     assert result["data"][CONF_RULES_UPDATED_AT] > 1_700_000_000
+
+
+async def test_invalid_rules_are_ignored(hass: HomeAssistant, entry: MockConfigEntry, hass_client) -> None:
+    client = await hass_client()
+    resp = await client.post("/api/ciggie_counter/v2/settings", data="{not json", headers={"Content-Type": "application/json"})
+    assert resp.status == 400
+    resp = await client.post("/api/ciggie_counter/v2/settings", json={"dailyTarget": 5})
+    assert resp.status == 400
+    resp = await client.post("/api/ciggie_counter/v2/settings", json={
+        "updatedAt": 1_900_000_000, "wakeHours": "nan", "dailyTarget": 1e300, "costPerCigarette": -1})
+    data = await resp.json()
+    assert data["wakeHours"] == 18.0 and data["dailyTarget"] is None and data["costPerCigarette"] is None
+    resp = await client.get("/api/ciggie_counter/today")
+    assert resp.status == 200
+
+
+async def test_rules_only_options_change_keeps_entry(hass: HomeAssistant, entry: MockConfigEntry) -> None:
+    counter = entry.runtime_data
+    base = {k: v for k, v in DEFAULTS.items() if k != "count_sources"}
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(result["flow_id"], base | {CONF_DAILY_TARGET: 12})
+    await hass.async_block_till_done()
+    assert entry.runtime_data is counter and counter.options[CONF_DAILY_TARGET] == 12

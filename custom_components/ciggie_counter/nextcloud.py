@@ -79,7 +79,11 @@ class NextcloudSync:
                 remote = await self._request("GET", "/mute")
                 counter.async_set_muted(bool(remote.get("muted")), from_hub=True)
 
-            await self._sync_rules()
+            try:
+                await self._sync_rules()
+            except (NextcloudError, TypeError, ValueError, AttributeError) as err:
+                # the rules must not hold up entries, mute and Butt Bin state
+                _LOGGER.warning("Rules sync with Nextcloud failed: %s", err)
 
             # Butt Bin state (battery …): the phone reports it to Nextcloud, take it over if newer
             remote_ashtray = await self._request("GET", "/ashtray")
@@ -100,7 +104,7 @@ class NextcloudSync:
             if str(err) == "app_missing":
                 return  # older Nextcloud app: rules stay local
             raise
-        remote_at = int(remote.get("updatedAt") or 0)
+        remote_at = int(float(remote.get("updatedAt") or 0))
         if remote_at > self.counter.rules_updated_at:
             self.counter.async_apply_rules(remote, from_hub=True)
         elif self.counter.rules_updated_at > remote_at:

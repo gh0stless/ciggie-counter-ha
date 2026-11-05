@@ -164,3 +164,20 @@ async def test_own_newer_rules_go_to_nextcloud(hass: HomeAssistant, aioclient_mo
     sent = posts[0][2]
     assert sent["updatedAt"] == 200 and sent["dailyTarget"] == 12 and sent["intervalMode"] == "computed"
     assert entry.runtime_data.options[CONF_DAILY_TARGET] == 12
+
+
+async def test_phone_rules_go_on_to_nextcloud(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    entry = await _setup(hass, aioclient_mock)
+    counter = entry.runtime_data
+    assert counter.async_apply_rules({"updatedAt": 1_900_000_000, "dailyTarget": 7})  # from the phone
+    await hass.async_block_till_done()
+    assert entry.runtime_data is counter  # no reload for a rules change
+    await NextcloudSync(hass, counter, NC, "andreas", "secret").async_sync()
+    posts = [c for c in aioclient_mock.mock_calls if c[0] == "POST" and str(c[1]).endswith("/v2/settings")]
+    assert posts and posts[-1][2]["dailyTarget"] == 7
+
+
+async def test_failing_rules_sync_does_not_stop_entries(hass: HomeAssistant, aioclient_mock: AiohttpClientMocker) -> None:
+    aioclient_mock.get(f"{API}/v2/settings", status=500)
+    entry = await _setup(hass, aioclient_mock)
+    assert len(entry.runtime_data.active) == 5  # entries still taken over
