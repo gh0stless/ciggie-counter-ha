@@ -361,3 +361,48 @@ async def test_rules_only_options_change_keeps_entry(hass: HomeAssistant, entry:
     await hass.config_entries.options.async_configure(result["flow_id"], base | {CONF_DAILY_TARGET: 12})
     await hass.async_block_till_done()
     assert entry.runtime_data is counter and counter.options[CONF_DAILY_TARGET] == 12
+
+
+async def test_reminder_comes_to_the_second(
+    hass: HomeAssistant, options: dict[str, Any], freezer: FrozenDateTimeFactory
+) -> None:
+    """Not up to a minute late: a timer wakes exactly when the break is over."""
+    freezer.move_to("2026-11-01T08:00:20+01:00")
+    options.update({CONF_INTERVAL_MODE: MODE_FIXED, CONF_FIXED_MINUTES: 10})
+    config_entry = MockConfigEntry(domain=DOMAIN, data={}, options=options)
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    reminders = async_capture_events(hass, EVENT_REMINDER)
+
+    await _press(hass)  # 08:00:20 -> allowed from 08:10:20
+    freezer.move_to("2026-11-01T08:10:19+01:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert reminders == []
+    freezer.move_to("2026-11-01T08:10:20+01:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert [e.data["type"] for e in reminders] == ["next_allowed"]
+
+
+async def test_count_check_counts_from_the_cigarette(
+    hass: HomeAssistant, options: dict[str, Any], freezer: FrozenDateTimeFactory
+) -> None:
+    """An entry that arrives late (phone, Nextcloud) restarts the interval at its own time."""
+    freezer.move_to("2026-11-01T08:00:00+01:00")
+    options.update({CONF_COUNT_CHECK_REMINDER: True, CONF_COUNT_CHECK_MINUTES: 15})
+    config_entry = MockConfigEntry(domain=DOMAIN, data={}, options=options)
+    config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    reminders = async_capture_events(hass, EVENT_REMINDER)
+    counter = config_entry.runtime_data
+
+    freezer.move_to("2026-11-01T08:05:00+01:00")  # counted 08:04:50, arrives 10 s later
+    counter.async_merge([{"id": "phone-0000-0001", "ts": "2026-11-01T08:04:50+01:00", "deleted": False}])
+    await hass.async_block_till_done()
+    freezer.move_to("2026-11-01T08:19:50+01:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert [e.data["type"] for e in reminders] == ["count_check"]

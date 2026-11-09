@@ -159,5 +159,6 @@ async def _options_updated(hass: HomeAssistant, entry: CiggieConfigEntry) -> Non
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: CiggieConfigEntry) -> bool:
+    entry.runtime_data.async_shutdown()
     await entry.runtime_data.async_flush()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

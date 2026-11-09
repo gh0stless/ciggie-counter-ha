@@ -16,6 +16,7 @@ import uuid
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.event import async_track_point_in_time
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
@@ -112,6 +113,8 @@ class CiggieCounter:
         self.last_hub_sync: datetime | None = None
         # called after local changes, e.g. to sync soon
         self.on_local_change: Callable[[], None] | None = None
+        # timer for the next due reminder (to the second, like the phone's exact alarms)
+        self._wake_unsub: Callable[[], None] | None = None
 
     # ------------------------------------------------------------------ storage
 
@@ -146,6 +149,7 @@ class CiggieCounter:
         self._rebuild()
         self._store.async_delay_save(self._data, 1)
         async_dispatcher_send(self.hass, SIGNAL_UPDATE)
+        self._schedule_wake()
         if local and self.on_local_change is not None:
             self.on_local_change()
 
@@ -274,7 +278,7 @@ class CiggieCounter:
         remaining = max(target - len(today), 1)
         seconds_left = (today[0] + timedelta(seconds=wake) - now).total_seconds()
         if seconds_left <= 0:
-            seconds_left = 60
+            return wake / target / 60  # waking time over: the basic break, not ever shorter ones
         return seconds_left / remaining / 60
 
     def next_allowed(self, now: datetime | None = None) -> datetime | None:
@@ -295,10 +299,10 @@ class CiggieCounter:
             today = self.on_day(self.today(now))
             if not today:
                 return last + wake / target
-            remaining = max(target - len(today), 1)
             day_end = today[0] + wake
-            if day_end <= now:
-                return last + timedelta(seconds=60 / remaining)
+            if last >= day_end:
+                return last + wake / target  # smoked after the waking time: the basic break
+            remaining = max(target - len(today), 1)
             return last + (day_end - last) / (remaining + 1)
         return last + timedelta(seconds=round(minutes * 60))
 
@@ -340,8 +344,12 @@ class CiggieCounter:
         fresh = [ts for ts in added if ts >= dt_util.now() - FRESH]
         if not fresh:
             return
-        self._last_count_check_at = dt_util.now().isoformat()
         newest = max(fresh)
+        # the count reminder restarts from the time of the cigarette, not from when it got here:
+        # so all devices run the same interval
+        last_check = _parse(self._last_count_check_at) if self._last_count_check_at else None
+        if last_check is None or newest > last_check:
+            self._last_count_check_at = newest.isoformat()
         self._rebuild()
         number = sum(1 for ts in self.on_day(self.today()) if ts <= newest)
         self.hass.bus.async_fire(
@@ -501,6 +509,41 @@ class CiggieCounter:
         if dirty:
             self._store.async_delay_save(self._data, 1)
         async_dispatcher_send(self.hass, SIGNAL_UPDATE)
+        self._schedule_wake(now)
+
+    def _due_times(self, now: datetime) -> list[datetime]:
+        due = []
+        if self.options.get(CONF_NEXT_ALLOWED_REMINDER):
+            nxt = self.next_allowed(now)
+            if nxt is not None:
+                due.append(nxt)
+        if self.options.get(CONF_COUNT_CHECK_REMINDER) and self._last_count_check_at:
+            last = _parse(self._last_count_check_at)
+            if last is not None:
+                due.append(last + timedelta(minutes=int(self.options.get(CONF_COUNT_CHECK_MINUTES) or 10)))
+        return due
+
+    @callback
+    def _schedule_wake(self, now: datetime | None = None) -> None:
+        """Wake up exactly when the next reminder is due (the minute tick stays as a fallback)."""
+        if self._wake_unsub is not None:
+            self._wake_unsub()
+            self._wake_unsub = None
+        now = now or dt_util.now()
+        upcoming = [t for t in self._due_times(now) if t > now]
+        if upcoming:
+            self._wake_unsub = async_track_point_in_time(self.hass, self._wake, min(upcoming))
+
+    @callback
+    def _wake(self, now: datetime) -> None:
+        self._wake_unsub = None
+        self.async_tick(now)
+
+    @callback
+    def async_shutdown(self) -> None:
+        if self._wake_unsub is not None:
+            self._wake_unsub()
+            self._wake_unsub = None
 
     @callback
     def async_use_options(self, options: dict[str, Any]) -> None:

@@ -4,6 +4,9 @@
 #   ciggie_counter_reminder  type next_allowed | count_check   (never fired while muted)
 #   ciggie_counter_counted   number, source, muted              (fresh entries only)
 #
+# Version 2.1.0
+# - Counted cigarettes are announced at a shared time: cigarette + "announce delay" seconds,
+#   the same time the Android app (1.0.15+) speaks. Minus "TTS lead" for Piper/player start-up.
 # Version 2.0.0
 # - Successor of the Nextcloud webhook blueprint (cigcounter_announce_blueprint.yaml 1.0.0):
 #   same inputs (night schedule, do-not-disturb, persons at home, TTS engine/player,
@@ -85,6 +88,24 @@ blueprint:
           selector:
             entity:
               domain: media_player
+        announce_delay:
+          name: "⏱️ Announce delay / Ansage-Verzögerung"
+          description: >
+            A counted cigarette is announced this many seconds after it was counted – on every
+            device at the same time (the Android app uses 20 s).
+            / So viele Sekunden nach dem Zählen wird angesagt – auf allen Geräten gleichzeitig
+            (die Android-App nimmt 20 s).
+          default: 20
+          selector:
+            number: {min: 0, max: 120, unit_of_measurement: s, mode: box}
+        tts_lead:
+          name: "🏃 TTS lead / TTS-Vorlauf"
+          description: >
+            How long TTS and player need until the first word is heard; started that much earlier.
+            / So lange brauchen TTS und Player bis zum ersten Wort; um so viel früher gestartet.
+          default: 2
+          selector:
+            number: {min: 0, max: 30, unit_of_measurement: s, mode: box}
 
     # ══════════════════════════════════════════════════
     # TELEGRAM
@@ -178,6 +199,13 @@ variables:
   v_night_schedule:  !input night_schedule
   v_persons:         !input person_trackers
   v_dnd:             !input do_not_disturb
+  v_delay:           !input announce_delay
+  v_lead:            !input tts_lead
+  # counted: wait until the shared announcement time (late arrivals: at once)
+  wait_seconds: >
+    {% if trigger.id == 'counted' %}
+      {{ [as_timestamp(trigger.event.data.timestamp) + v_delay - v_lead - as_timestamp(now()), 0] | max | round(1) }}
+    {% else %}0{% endif %}
 
   kind: >
     {{ trigger.event.data.type if trigger.id == 'reminder' else 'counted' }}
@@ -204,6 +232,13 @@ conditions:
     value_template: "{{ wanted }}"
 
 actions:
+  - if:
+      - condition: template
+        value_template: "{{ wait_seconds | float(0) > 0 }}"
+    then:
+      - delay:
+          seconds: "{{ wait_seconds | float(0) }}"
+
   # TTS – if the player fails, Telegram still goes out
   - if:
       - condition: template
